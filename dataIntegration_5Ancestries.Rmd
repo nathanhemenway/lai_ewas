@@ -1,0 +1,451 @@
+---
+title: "RFMix Methylation Integration"
+output: html_document
+date: "2024-04-07"
+---
+
+```{r setup, include=FALSE}
+library(readr)
+library(data.table)
+library(stringr)
+library(limma)
+library(ewastools)
+# example <- read.table("/home/lutiffan/rfmix/results/trimmed_header_chr22_result.RFMix.msp.tsv", sep = '\t', header = TRUE)
+
+# ffcwChr14_og <- readr::read_tsv("/nfs/turbo/bakulski1/Projects/FFCW_geno/RFMix_output/chr14_result.rfmix.msp.tsv", skip = 1)
+
+# chr14_result_five_ancestries.rfmix.msp.tsv
+ffcwChr14 <- readr::read_tsv("/nfs/turbo/bakulski1/Projects/FFCW_geno/RFMix_output/chr14_result_five_ancestries.rfmix.msp.tsv", skip = 1)
+
+ffcwChr14_header <- readr::read_tsv("/nfs/turbo/bakulski1/Projects/FFCW_geno/RFMix_output/chr14_result_five_ancestries.rfmix.msp.tsv", n_max = 1); ffcwChr14_header
+
+# Mapping of geno IDs to methyl IDs?
+pheno <- read.csv("/nfs/turbo/bakulski1/People/data/ffcw/methyl_data/Feb2022_datafreeze/pd_analytic_freeze1.csv")
+teenPheno <- pheno[pheno$childteen == "T",]
+
+# fullphen <- readRDS("/nfs/turbo/bakulski1/People/alreiner/data/fullpheno.rds")
+
+head(colnames(ffcwChr14[,7:ncol(ffcwChr14)]))
+
+# Available in stringr version 1.5
+# subIdsGeno <- str_split_i(colnames(ffcwChr14[,7:ncol(ffcwChr14)])[1], pattern = "_", i = 1)
+
+# idString <- colnames(ffcwChr14[,7:ncol(ffcwChr14)])[1]
+# 
+# subIdsGeno <- str_split(colnames(ffcwChr14[,7:ncol(ffcwChr14)])[1], pattern = "_")[[1]][2]
+
+isolateIds <- function(idString) {
+  noFamily <- str_split(idString, pattern = "_")[[1]][2]
+  str_split(noFamily, pattern = "k")[[1]]
+}
+
+subIdsGeno <- unlist(lapply(X = colnames(ffcwChr14[,7:ncol(ffcwChr14)]), FUN = isolateIds))
+
+length(subIdsGeno)
+length(unique(subIdsGeno))
+mean(subIdsGeno %in% teenPheno$idnum) # 27.6% of genotyped teens have methylation data
+mean(pheno$idnum %in% unique(subIdsGeno)) # 98.9% of teens with methylation data have genotype data
+
+
+sum(subIdsGeno %in% teenPheno$idnum)
+teenIdsGeno <- subIdsGeno[subIdsGeno %in% teenPheno$idnum]
+length(teenIdsGeno)
+length(unique(teenIdsGeno))
+
+teenIdsUnique <- unique(teenIdsGeno)
+teenIdsMatched <- dplyr::left_join(data.frame("idnum" = as.numeric(teenIdsUnique)), pheno, by = dplyr::join_by(idnum)) %>%
+  dplyr::filter(childteen == "T") %>%
+  dplyr::select(idnum, MethID, sex) 
+
+# Ensure that both IDs are in the same order
+mean(teenIdsUnique == teenIdsMatched$idnum) # 100% the same!
+```
+Family IDs
+```{r}
+isolateFamilyIds <- function(idString) {
+  noFamily <- str_split(idString, pattern = "_")[[1]][1]
+}
+
+famIdsGeno <- unique(unlist(lapply(X = colnames(ffcwChr14[,7:ncol(ffcwChr14)]), FUN = isolateFamilyIds)))
+
+mean(famIdsGeno %in% pheno$idnum)
+```
+Noodle around
+```{r}
+# Check ancestry breakdown of first chromosome segment
+barplot(table(as.numeric(ffcwChr14[2, 7:ncol(ffcwChr14), drop = T])))
+
+# Check ancestry breakdown of first SUBJECT
+# barplot(table(as.numeric(example$HG00096.0))) # pretty homogeneous
+
+# Check subject ages
+summary(teenPheno$ck6yagey)
+sum(teenPheno$ck6yagey != 15)
+mean(teenPheno$ck6yagey == 15)
+hist(teenPheno$ck6yagey[teenPheno$ck6yagey > 0])
+
+table(teenPheno$ck6yagey)
+```
+Find the relevant annotation information for Illumina 450k array
+```{r}
+library(IlluminaHumanMethylation450kanno.ilmn12.hg19)
+# Full beta matrix
+betaFileName <- "/nfs/turbo/bakulski1/People/data/ffcw/methyl_data/Feb2022_datafreeze/beta_analytic_freeze1.rds" # file.choose()
+betas <- readRDS(betaFileName) # 5.9 GB
+
+# Steps to remove cross-reactive probes
+load("/nfs/turbo/bakulski1/cross.probes.info.450k.rda")
+head(cross.probes.info)
+
+# Get vector of names of cross-reactive probes in our beta matrix
+crRows <- which(rownames(betas) %in% cross.probes.info$TargetID)
+betas <- betas[-crRows,]
+# dim(betas)
+# [1] 410447   1684
+
+# I ended up deleting this because it's literally the same thing as what I just made
+# and I want to save storage space
+# cleanBetas <- readRDS("/home/lutiffan/betaMatrix/cleanedBetas.RDS"); dim(cleanBetas)
+# [1] 410447   1684
+
+# # What is this annotation all about? 
+# test <- read.csv("/nfs/turbo/bakulski1/Illumina_450k_annotation_20140128.csv")
+
+relevantLabels <- Locations[rownames(betas),]
+sum(relevantLabels$chr == "chr14") # 12730
+relevantLabelsChr14 <- relevantLabels[relevantLabels$chr == "chr14",]
+head(rownames(relevantLabels))
+head(rownames(relevantLabelsChr14))
+
+betasChr14 <- betas[relevantLabels$chr == "chr14",]
+
+head(colnames(betasChr14))
+
+teenBetaCols <- colnames(betasChr14) %in% teenIdsMatched$MethID
+teenBeta <- betasChr14[, teenBetaCols]
+
+mean(colnames(teenBeta) == teenIdsMatched$MethID) # Need to sort beta matrix to match 
+finalBeta <- teenBeta[,order(match(colnames(teenBeta), teenIdsMatched$MethID))]
+
+mean(colnames(finalBeta) == teenIdsMatched$MethID) # Need to sort beta matrix to match 
+
+# Sanity check
+mean(pheno$MethID %in% colnames(betasChr14))
+```
+Estimate cell composition?
+```{r}
+#Calculate cell type proportions per sample with EWAS tools
+#gaps and sex chr are still included, just rearranged beta cols to match age9pd ordering
+# cells <- estimateLC(meth=beta_9, ref='saliva',constrained=T)
+cells <- estimateLC(meth = finalBeta, ref = 'saliva', constrained = TRUE)
+
+summary(cells$Epithelial.cells)
+length(cells$Epithelial.cells)
+hist(cells$Epithelial.cells)
+```
+Build covariate data frame
+```{r}
+n <- length(teenIdsUnique)
+dosage <- data.frame("ancestry0" = integer(n),
+                     "ancestry1" = integer(n),
+                     "ancestry2" = integer(n),
+                     "ancestry3" = integer(n),
+                     "ancestry4" = integer(n),
+                     # "ancestry5" = integer(n),
+                     # "ancestry6" = integer(n),
+                     "sex" = character(n),
+                     "epithelial" = numeric(n))
+rownames(dosage) <- teenIdsMatched$MethID
+
+dosagePerRegion <- vector(mode = "list", length = nrow(ffcwChr14))
+
+for (i in seq_along(dosagePerRegion)) {
+  dosagePerRegion[[i]] <- dosage
+}
+
+# # Spot check
+# dosagePerRegion[[19]]
+
+for (i in seq_along(teenIdsUnique)) {
+  idDataIdx <- colnames(ffcwChr14) %like% teenIdsUnique[i]
+  idData <- ffcwChr14[, idDataIdx]
+  
+  ancestry0 <- (idData[,1] == 0) + (idData[,2] == 0)
+  ancestry1 <- (idData[,1] == 1) + (idData[,2] == 1)
+  ancestry2 <- (idData[,1] == 2) + (idData[,2] == 2)
+  ancestry3 <- (idData[,1] == 3) + (idData[,2] == 3)
+  ancestry4 <- (idData[,1] == 4) + (idData[,2] == 4)
+  # ancestry5 <- (idData[,1] == 5) + (idData[,2] == 5)
+  # ancestry6 <- (idData[,1] == 6) + (idData[,2] == 6)
+  
+  subjectSex <- teenIdsMatched$sex[teenIdsMatched$idnum == teenIdsUnique[i]]
+  subjectEpithelial <- cells$Epithelial.cells[i]
+  
+  idDoses <- data.frame("ancestry0" = ancestry0,
+                        "ancestry1" = ancestry1,
+                        "ancestry2" = ancestry2,
+                        "ancestry3" = ancestry3,
+                        "ancestry4" = ancestry4,
+                        # "ancestry5" = ancestry5,
+                        # "ancestry6" = ancestry6,
+                        "sex" = rep(subjectSex, nrow(ffcwChr14)),
+                        "epithelial" = rep(subjectEpithelial, nrow(ffcwChr14)))
+  for (j in 1:nrow(ffcwChr14)) {
+    dosagePerRegion[[j]][i,] <- idDoses[j,]
+  }
+}
+
+saveRDS(dosagePerRegion, file = "/home/lutiffan/rfmix/dosagePerRegion.RDS")
+```
+Check out subject data for a region
+```{r}
+dosagePerRegion <- readRDS("/home/lutiffan/rfmix/dosagePerRegion.RDS")
+# Verify alignment of subject IDs (columns of beta matrix, rows of covariate matrix)
+mean(rownames(dosagePerRegion[[1]]) == colnames(finalBeta))
+summary(dosagePerRegion[[1]])
+# View(dosagePerRegion[[1]])
+dosagePerRegion[[nrow(ffcwChr14)]]
+```
+Map CpG sites to RFMix output ranges
+```{r}
+# Verify that positions labels are correctly mapped to CpG probes
+mean((rownames(relevantLabelsChr14)) == rownames(finalBeta))
+
+cpgPosition <- relevantLabelsChr14$pos
+
+rfmixRow <- numeric(length(cpgPosition))
+
+for (i in seq_along(cpgPosition)) {
+  withinRange <- which(cpgPosition[i] > ffcwChr14$spos & cpgPosition[i] < ffcwChr14$epos)
+  if (length(withinRange) > 1) {
+    browser() # This should not happen bc the RFMix windows are non-overlapping
+  } else if (length(withinRange) == 0) {
+    rfmixRow[i] <- NA
+  } else {
+    rfmixRow[i] <- withinRange
+  }
+}
+
+summary(rfmixRow) # 39 NAs
+length(unique(rfmixRow)) # 452 used out of 493
+length(rfmixRow)
+```
+Test one probe
+```{r}
+testReduced <- lm(finalBeta[1,] ~ 1 +
+             as.factor(sex) +
+             epithelial,
+           data = dosagePerRegion[[rfmixRow[1]]])
+
+testFull <- lm(finalBeta[1,] ~ 1 + ancestry0 + 
+             ancestry1 + 
+             ancestry2 + 
+             ancestry3 + 
+             ancestry4 + 
+             # ancestry5 + 
+             # ancestry6 +
+             as.factor(sex) +
+             epithelial,
+           data = dosagePerRegion[[rfmixRow[1]]])
+
+summary(testReduced)
+summary(testFull)
+
+lr <- anova(testFull, testReduced)
+lr
+lr$`Pr(>F)`
+```
+EWAS time!
+```{r}
+pVals <- numeric(nrow(finalBeta))
+
+for (i in 1:nrow(finalBeta)) {
+  if (is.na(rfmixRow[i])) {
+    pVals[i] <- NA
+    next
+  }
+  lmReduced <- lm(finalBeta[i,] ~ 1 +
+             as.factor(sex) +
+             epithelial,
+             data = dosagePerRegion[[rfmixRow[i]]])
+
+  lmFull <- lm(finalBeta[i,] ~ 1 + ancestry0 + 
+             ancestry1 + 
+             ancestry2 + 
+             ancestry3 + 
+             ancestry4 + 
+             # ancestry5 + 
+             # ancestry6 +
+             as.factor(sex) +
+             epithelial,
+           data = dosagePerRegion[[rfmixRow[i]]])
+
+# summary(lmReduced)
+# summary(lmFull)
+
+lr <- anova(lmFull, lmReduced)
+# lr
+pVals[i] <- lr$`Pr(>F)`[2]
+}
+
+saveRDS(pVals, file = "/home/lutiffan/rfmix/EWASPvals.RDS")
+```
+Inspect results
+```{r}
+pVals <- readRDS("/home/lutiffan/rfmix/EWASPvals.RDS")
+sum(pVals[!is.na(pVals)] < 2.4E-7)
+summary(pVals[!is.na(pVals)])
+hist(pVals, breaks = 100)
+
+cpgOrder <- order(cpgPosition)
+pValsOrdered <- pVals[cpgOrder]
+pValsTransformed <- -log(pValsOrdered, base = 10)
+
+plot(1:length(pValsTransformed), pValsTransformed, ylab = "-log_10(p-value)", xlab = "position")
+abline(h = -log(2.4E-7, base = 10), col = "green", lty = 2, lwd = 2)
+
+
+# Calculate the genomic-control lambda.  
+chisqConversion <- qchisq(pVals[!is.na(pVals)], df = 1, lower.tail = FALSE)
+lambda <- median(chisqConversion)/qchisq(0.5, 1); lambda
+
+
+qqplot(x = -log(runif(nrow(finalBeta)), base = 10), y = pValsTransformed, xlab = "", ylab = "-log_10(p-value)")
+abline(a = 0, b = 1)
+```
+Visualize top 5 SNPs
+```{r}
+library(ggplot2)
+sortPVals <- order(pVals, decreasing = FALSE)
+top5Idx <- sortPVals[1:5]
+
+saveBoxplots <- vector(mode = "list", length = 5)
+saveHists <- vector(mode = "list", length = 5)
+
+for (i in 1:5) {
+  ancestryHere <- dosagePerRegion[[ rfmixRow[top5Idx[i]] ]]
+  ancestryPairs <- character(nrow(ancestryHere))
+  
+  for (j in 1:nrow(ancestryHere)) {
+    whichAncestries <- which(ancestryHere[j,1:5] != 0)
+    a1 <- switch(as.character(whichAncestries[1]),
+                   "1" = "EAS",
+                   "2" = "EUR",
+                   "3" = "MEA",
+                   "4" = "NAM",
+                   "5" = "AFR")
+    if (length(whichAncestries) > 1) {
+      a2 <- switch(as.character(whichAncestries[2]),
+                   "1" = "EAS",
+                   "2" = "EUR",
+                   "3" = "MEA",
+                   "4" = "NAM",
+                   "5" = "AFR")
+      ancestryPairs[j] <- paste0(a1, "+", a2)
+      # ancestryPairs[j] <- paste0("a", whichAncestries[1], "+", "a", whichAncestries[2])
+    } else {
+      ancestryPairs[j] <- paste0(a1, "+", a1)
+      # ancestryPairs[j] <- paste0("a", whichAncestries[1], "+", "a", whichAncestries[1])
+    }
+  }
+  
+  betaByAncestry <- data.frame("Beta" = finalBeta[top5Idx[i],],
+                               "Ancestry" = factor(ancestryPairs))
+  
+  # Calculate the medians for each Ancestry group
+  medians <- betaByAncestry %>%
+    dplyr::group_by(Ancestry) %>%
+    dplyr::summarize(median_beta = median(Beta)) %>%
+    dplyr::arrange(median_beta) %>%
+    dplyr::ungroup() # Make sure to ungroup so the factor levels are affected for the whole dataframe
+  
+  # Reorder the Ancestry levels based on the medians
+  betaByAncestry$Ancestry <- factor(betaByAncestry$Ancestry, levels = medians$Ancestry)
+  
+  # Try leaving out AFR+AFR from plot 2 bc it looks weird
+  # betaByAncestryNoAfr <- betaByAncestry %>% dplyr::filter(Ancestry != "AFR+AFR")
+  
+  # Add per-category counts
+  group_sizes <- betaByAncestry %>%
+    dplyr::group_by(Ancestry) %>%
+    dplyr::summarise(count = dplyr::n()) %>%
+    dplyr::ungroup() %>%
+    dplyr::filter(count >= 30) %>% # Keep only groups with at least 30 observations
+    dplyr::ungroup()
+  
+  # # Create the sorted boxplot
+  # saveBoxplots[[i]] <- ggplot(betaByAncestry, aes(x = Ancestry, y = Beta)) +
+  #   geom_boxplot() +
+  #   xlab("Ancestry") +
+  #   ylab("Beta") +
+  #   theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  
+  # Filter the main data.frame to include only the groups with count >= 30
+  betaByAncestry <- betaByAncestry %>%
+  dplyr::filter(Ancestry %in% group_sizes$Ancestry)
+  
+  # Create the sorted boxplot
+  saveBoxplots[[i]] <- ggplot(betaByAncestry, aes(x = Ancestry, y = Beta)) +
+    geom_violin() +
+    geom_text(data = group_sizes, aes(x = Ancestry, y = min(betaByAncestry$Beta), label = paste("n =", count)), 
+            position = position_dodge(width = 0.9), color = 'blue', hjust = -0.2) +
+    xlab("Ancestry") +
+    ylab("Beta") +
+    ggtitle(paste0(rownames(finalBeta)[top5Idx[i]], " (p-value: ", signif(pVals[top5Idx[i]], 2) , ")")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  
+  # Try leaving out AFR+AFR
+  
+  betaByAncestryNoAfr <- betaByAncestryNoAfr %>%
+  dplyr::filter(Ancestry %in% group_sizes$Ancestry)
+  
+  ggplot(betaByAncestryNoAfr, aes(x = Ancestry, y = Beta)) +
+    geom_violin() +
+    geom_text(data = group_sizes, aes(x = Ancestry, y = min(betaByAncestryNoAfr$Beta), label = paste("n =", count)), 
+            position = position_dodge(width = 0.9), color = 'blue', hjust = -0.2) +
+    xlab("Ancestry") +
+    ylab("Beta") +
+    ggtitle(paste0(rownames(finalBeta)[top5Idx[i]], " (p-value: ", signif(pVals[top5Idx[i]], 2) , ")")) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  
+  print(saveBoxplots[[i]])
+  
+  # boxplot(finalBeta[top5Idx[i],] ~ factor(ancestryPairs), las = 2, xlab = "")
+  
+  hist(finalBeta[top5Idx[i],], breaks = 50, main = paste0("Beta across all samples at ", rownames(finalBeta)[top5Idx[i]]), xlim = c(0,1), xlab = "Beta")
+}
+
+# saveBoxplots[[1]]
+# saveHists[[1]]
+
+# saveBoxplots[[2]]
+# saveHists[[2]]
+```
+Analyze permutation P values
+```{r}
+permutationPVals <- readRDS("/home/lutiffan/rfmix/permutationPVals.RDS")
+
+# par(mfrow = c(3, 3))
+gcLambda <- numeric(length(permutationPVals))
+for (i in seq_along(permutationPVals)) {
+  pValsTransformed <- -log(permutationPVals[[i]], base = 10)
+  
+  # Calculate the genomic-control lambda.  
+  chisqConversion <- qchisq(permutationPVals[[i]][!is.na(permutationPVals[[i]])], df = 1, lower.tail = FALSE)
+  gcLambda[i] <- median(chisqConversion)/qchisq(0.5, 1)
+
+  # png(filename = paste0("/home/lutiffan/rfmix/images/permutationqq", i))
+  set.seed(0)
+  # Set y-axis to match main EWAS scale
+  # qqplot(x = -log(runif(10000), base = 10), y = pValsTransformed, ylim = c(0, 110), ylab = "", xlab = "")
+  qqplot(x = -log(runif(10000), base = 10), y = pValsTransformed, ylab = "", xlab = "")
+  abline(a = 0, b = 1)
+  # dev.off()
+  
+  # png(filename = paste0("/home/lutiffan/rfmix/images/permutationhist", i))
+  # hist(permutationPVals[[i]], breaks = 100)
+  # dev.off()
+}
+
+gcLambda
+```
