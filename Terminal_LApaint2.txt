@@ -1,0 +1,129 @@
+Last login: Sun Apr 14 16:14:41 on ttys000
+(base) nathanhemenway@Nathans-Air-40 ~ % ssh nathanhe@greatlakes.arc-ts.umich.edu
+ssh: connect to host greatlakes.arc-ts.umich.edu port 22: Operation timed out
+(base) nathanhemenway@Nathans-Air-40 ~ % ssh nathanhe@greatlakes.arc-ts.umich.edu
+************************************************************************
+* By your use of these resources, you agree to abide by Proper Use of  *
+* Information Resources, Information Technology, and Networks at the   *
+* University of Michigan (SPG 601.07), in addition to all relevant     *
+* state and federal laws. http://spg.umich.edu/policy/601.07           *
+************************************************************************
+* By using these resources, you certify that you are not presently     *
+* located in a Comprehensively Embargoed Country (OFAC – Sanctions     *
+* Programs) and that your use of the resources will comply in all      *
+* respects with all applicable law, including U.S. export control      *
+* laws and regulations, as well as with University policy.             *
+* For questions contact the U-M Export Control Program at              *
+* exportcontrols@umich.edu                                             *
+************************************************************************
+
+(nathanhe@greatlakes.arc-ts.umich.edu) Password: 
+(nathanhe@greatlakes.arc-ts.umich.edu) Duo two-factor login for nathanhe
+
+Enter a passcode or select one of the following options:
+
+ 1. Duo Push to XXX-XXX-1258
+ 2. Phone call to XXX-XXX-1258
+ 3. SMS passcodes to XXX-XXX-1258
+
+Passcode or option (1-3): 1
+Success. Logging you in...
+Last login: Fri Apr 12 11:21:49 2024 from 35.3.127.207
+*                      Advanced Research Computing                           *
+                         University of Michigan
+                         arc-support@umich.edu
+
+                         Welcome to Great Lakes
+
+User documentation: http://arc.umich.edu/greatlakes/user-guide/
+The folders under /scratch are intended for data that is in active
+use only.  Please do not store data there for longer than 60 days.
+For usage information, policies, and updates, please see:
+https://arc.umich.edu/document/greatlakes-policies/
+------------------------------------------------------------------------
+
+
+[nathanhe@gl-login2 ~]$ ls
+ 1000G
+'Adding correct HGDP labels.ipynb'
+ black_q25.rfmix.msp.tsv
+'Creating local ancestry painter files.ipynb'
+ Desktop
+ Downloads
+ ffcw_1000g_merge.ipynb
+ ffcw_imputed
+'FFCW imputed vcf cleaning.ipynb'
+ ffcw_pca_maybe.R
+ ffcw_projected_pca.ipynb
+ first_file
+ genome_ref
+'Global ancestry.ipynb'
+ hail-20231231-1502-0.2.126-ee77707f4fab.log
+ HGDP_938_SampleAncestry_no_Oceania_CSAsia.txt
+ ondemand
+ R
+ rfmix2_files
+ Untitled1.ipynb
+ Untitled2.ipynb
+ vcf_allele_freq_and_dup_check.ipynb
+[nathanhe@gl-login2 ~]$ cd rfmix2_files/
+[nathanhe@gl-login2 rfmix2_files]$ ls
+ancestry_grapher                             HGDP_removed_ids.txt
+genetic_map_hg38_withX.txt                   RFMix2_install
+genetic_map_hg38_withX_with_chr_no_rate.txt  RFMix2_Out
+genetic_map_hg38_withX_with_chr.txt          share_to_nathan
+[nathanhe@gl-login2 rfmix2_files]$ cd ancestry_grapher/
+[nathanhe@gl-login2 ancestry_grapher]$ ls
+RFmix2-Pipeline-to-plot
+[nathanhe@gl-login2 ancestry_grapher]$ cd RFmix2-Pipeline-to-plot/
+[nathanhe@gl-login2 RFmix2-Pipeline-to-plot]$ ls
+Example_dataset      LocalAncestryPaint  README.md        scriptrfmix.txt
+GlobalAncestryPaint  map                 Sample_map_File
+[nathanhe@gl-login2 RFmix2-Pipeline-to-plot]$ cd LocalAncestryPaint/
+[nathanhe@gl-login2 LocalAncestryPaint]$ LS
+-bash: LS: command not found
+[nathanhe@gl-login2 LocalAncestryPaint]$ ls
+all_chr.txt                Mozabite1.bed             Mozabite1_chr21.msp.tsv
+BedToLAP.py                Mozabite1_chr10.msp.tsv   Mozabite1_chr22.msp.tsv
+black_q25.bed              Mozabite1_chr11.msp.tsv   Mozabite1_chr2.msp.tsv
+black_q25_hap1.bed         Mozabite1_chr12.msp.tsv   Mozabite1_chr3.msp.tsv
+black_q25_hap2.bed         Mozabite1_chr13.msp.tsv   Mozabite1_chr4.msp.tsv
+black_q25_LAP              Mozabite1_chr14_hap1.bed  Mozabite1_chr5.msp.tsv
+black_q25_LAP.pdf          Mozabite1_chr14_hap2.bed  Mozabite1_chr6.msp.tsv
+black_q25.rfmix.msp.tsv    Mozabite1_chr14.msp.tsv   Mozabite1_chr7.msp.tsv
+black_q30.rfmix.msp.tsv    Mozabite1_chr15.msp.tsv   Mozabite1_chr8.msp.tsv
+hg38.svg                   Mozabite1_chr16.msp.tsv   Mozabite1_chr9.msp.tsv
+LAP.py                     Mozabite1_chr17.msp.tsv   Plot
+librsvg                    Mozabite1_chr18.msp.tsv   RFMix2ToBed.py
+Mozabite1_allchr_hap1.bed  Mozabite1_chr19.msp.tsv   rsvg-convert.1
+Mozabite1_allchr_hap2.bed  Mozabite1_chr1.msp.tsv    sample_file.txt
+Mozabite1_allchr.msp.tsv   Mozabite1_chr20.msp.tsv   singularity
+[nathanhe@gl-login2 LocalAncestryPaint]$ less -S black_q30.rfmix.msp.tsv 
+[nathanhe@gl-login2 LocalAncestryPaint]$ less -S black_q25.rfmix.msp.tsv 
+[nathanhe@gl-login2 LocalAncestryPaint]$ sed -i '1s/^/#Subpopulation order\/codes: East Asia=0\tEurope=1\tMiddle East=2\tNative America=3\tSub-Saharan Africa=4\n/' black_q30.rfmix.msp.tsv
+[nathanhe@gl-login2 LocalAncestryPaint]$ less -S black_q30.rfmix.msp.tsv 
+[nathanhe@gl-login2 LocalAncestryPaint]$ module load python/3.9
+[nathanhe@gl-login2 LocalAncestryPaint]$ python RFMix2ToBed.py --input black_q30.rfmix.msp.tsv --output black_q30
+[nathanhe@gl-login2 LocalAncestryPaint]$ python BedToLAP.py --bed1 black_q30_hap1.bed --bed2 black_q30_hap2.bed --ancestry0 "#CA1E0D" --ancestry1 "#B6AE1A" --ancestry2 "#911AB6" --ancestry3 "#23B61A" --ancestry4 "#1A2DB6" --out black_q30.bed
+[nathanhe@gl-login2 LocalAncestryPaint]$ singularity exec ./singularity/lap.sif python3 ./LAP.py -I black_q30.bed -O black_q30_LAP -B hg38
+
+
+Singularity is now only available via the modules system.  To load the
+current default Singularity module, please use
+
+    $ module load singularity
+
+
+[nathanhe@gl-login2 LocalAncestryPaint]$ module load singularity
+[nathanhe@gl-login2 LocalAncestryPaint]$ singularity exec ./singularity/lap.sif python3 ./LAP.py -I black_q30.bed -O black_q30_LAP -B hg38
+File converted to pdf: black_q30_LAP.pdf
+[nathanhe@gl-login2 LocalAncestryPaint]$ less -S black_q30.rfmix.msp.tsv 
+[nathanhe@gl-login2 LocalAncestryPaint]$ less -S black_q25.rfmix.msp.tsv 
+[nathanhe@gl-login2 LocalAncestryPaint]$ less -S black_q30.rfmix.msp.tsv 
+[nathanhe@gl-login2 LocalAncestryPaint]$ sed -i '1s/^/#Subpopulation order\/codes: East Asia=0\tEurope=1\tMiddle East=2\tNative America=3\tSub-Saharan Africa=4\n/' black_q30.rfmix.msp.tsv
+[nathanhe@gl-login2 LocalAncestryPaint]$ less -S black_q30.rfmix.msp.tsv 
+[nathanhe@gl-login2 LocalAncestryPaint]$ python RFMix2ToBed.py --input black_q30.rfmix.msp.tsv --output black_q30
+[nathanhe@gl-login2 LocalAncestryPaint]$ python BedToLAP.py --bed1 black_q30_hap1.bed --bed2 black_q30_hap2.bed --ancestry0 "#CA1E0D" --ancestry1 "#B6AE1A" --ancestry2 "#911AB6" --ancestry3 "#23B61A" --ancestry4 "#1A2DB6" --out black_q30.bed
+[nathanhe@gl-login2 LocalAncestryPaint]$ singularity exec ./singularity/lap.sif python3 ./LAP.py -I black_q30.bed -O black_q30_LAP -B hg38
+File converted to pdf: black_q30_LAP.pdf
+[nathanhe@gl-login2 LocalAncestryPaint]$ 
